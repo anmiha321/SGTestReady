@@ -84,7 +84,7 @@
 
 # Примеры команд:
 
-### run import --file=TSVData/jobtitle.tsv --type=jobtitle
+### dotnet run import --file=TSVData/jobtitle.tsv --type=jobtitle
 
 ### dotnet run import --file=data/departments.tsv --type=department
 
