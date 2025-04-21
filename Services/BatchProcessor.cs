@@ -67,30 +67,33 @@ namespace SGtest.Services
         
         public void ImportJobTitlesInBatches(string filePath)
         {
-            ProcessFileInBatches(filePath, batch =>
+            Action<List<string>> processBatch = batch =>
             {
                 var jobTitlesToAdd = new List<JobTitle>();
                 var existingTitles = _dbContext.JobTitles.Select(j => j.Name.ToLower()).ToHashSet();
-                
+
                 foreach (var line in batch)
                 {
                     var name = line.Trim();
                     if (string.IsNullOrWhiteSpace(name))
                         continue;
-                    
+
                     if (!existingTitles.Contains(name.ToLower()))
                     {
                         jobTitlesToAdd.Add(new JobTitle { Name = name });
                         existingTitles.Add(name.ToLower());
                     }
                 }
-                
+
                 if (jobTitlesToAdd.Count > 0)
                 {
                     _dbContext.JobTitles.AddRange(jobTitlesToAdd);
                     _dbContext.SaveChanges();
                 }
-            });
+            };
+            
+            ProcessFileInBatches(filePath, processBatch);
+            UpdateDepartmentManagers();
         }
         
         public void ImportDepartmentsInBatches(string filePath)
@@ -111,11 +114,11 @@ namespace SGtest.Services
                 departmentDictionary[nameKey] = dept.Id;
             }
             
-            ProcessFileInBatches(filePath, batch =>
+            Action<List<string>> processBatch = batch =>
             {
                 var newDepartments = new List<Department>();
                 var updatedDepartments = new List<Department>();
-                
+
                 foreach (var line in batch)
                 {
                     try
@@ -123,23 +126,23 @@ namespace SGtest.Services
                         string[] parts = line.Split('\t');
                         if (parts.Length < 3)
                             continue;
-                            
+
                         string name = parts[0].Trim();
                         string parentName = parts[1].Trim();
                         string phone = parts.Length > 3 ? Regex.Replace(parts[3].Trim(), @"[^\d]", "") : null;
-                        
+
                         int? parentId = null;
-                        if (!string.IsNullOrWhiteSpace(parentName) && 
+                        if (!string.IsNullOrWhiteSpace(parentName) &&
                             departmentDictionary.TryGetValue(parentName.ToLower(), out int pId))
                         {
                             parentId = pId;
                         }
-                        
+
                         int? managerId = null;
-                        
+
                         string fullKey = $"{name.ToLower()}_{parentId}";
                         string nameKey = name.ToLower();
-                        
+
                         if (departmentDictionary.TryGetValue(fullKey, out int existingIdByFullKey))
                         {
                             // update department with the same parent key and name
@@ -151,7 +154,7 @@ namespace SGtest.Services
                                 ManagerId = managerId,
                                 Phone = phone
                             };
-                            
+
                             updatedDepartments.Add(dept);
                         }
                         else if (departmentDictionary.TryGetValue(nameKey, out int existingIdByName))
@@ -165,9 +168,9 @@ namespace SGtest.Services
                                 ManagerId = managerId,
                                 Phone = phone
                             };
-                            
+
                             updatedDepartments.Add(dept);
-                            
+
                             // Update the dictionary to a new relationship key+name
                             departmentDictionary[fullKey] = existingIdByName;
                         }
@@ -180,7 +183,7 @@ namespace SGtest.Services
                                 ManagerId = managerId,
                                 Phone = phone
                             };
-                            
+
                             newDepartments.Add(dept);
                         }
                     }
@@ -189,25 +192,25 @@ namespace SGtest.Services
                         Console.Error.WriteLine($"Error parsing department line: {ex.Message}");
                     }
                 }
-                
+
                 if (newDepartments.Count > 0)
                 {
                     _dbContext.Departments.AddRange(newDepartments);
                     _dbContext.SaveChanges();
-                    
+
                     // Update ductionary with a new departments
                     foreach (var dept in newDepartments)
                     {
                         string fullKey = $"{dept.Name.ToLower()}_{dept.ParentId}";
                         string nameKey = dept.Name.ToLower();
-                        
+
                         departmentDictionary[fullKey] = dept.Id;
                         departmentDictionary[nameKey] = dept.Id;
-                        
+
                         existingDepartments.Add(new { dept.Id, dept.Name, dept.ParentId });
                     }
                 }
-                
+
                 if (updatedDepartments.Count > 0)
                 {
                     foreach (var dept in updatedDepartments)
@@ -216,10 +219,16 @@ namespace SGtest.Services
                         _dbContext.Entry(dept).Property(d => d.ParentId).IsModified = true;
                         _dbContext.Entry(dept).Property(d => d.Phone).IsModified = true;
                     }
+
                     _dbContext.SaveChanges();
                 }
-            });
+            };
             
+            ProcessFileInBatches(filePath, processBatch);
+            
+            _dbContext.ChangeTracker.Clear();
+            
+            ProcessFileInBatches(filePath, processBatch);
             UpdateDepartmentManagers();
         }
         
@@ -267,12 +276,12 @@ namespace SGtest.Services
                     e => e.FullName.ToLower(),
                     e => e.Id
                 );
-            
-            ProcessFileInBatches(filePath, batch =>
+
+            Action<List<string>> processBatch = batch =>
             {
                 var newEmployees = new List<Employee>();
                 var updatedEmployees = new List<Employee>();
-                
+
                 foreach (var line in batch)
                 {
                     try
@@ -280,30 +289,30 @@ namespace SGtest.Services
                         string[] parts = line.Split('\t');
                         if (parts.Length < 5)
                             continue;
-                            
+
                         string departmentName = parts[0].Trim();
                         string fullName = parts[1].Trim();
                         string login = parts[2].Trim();
                         string password = parts[3].Trim();
                         string jobTitleName = parts[4].Trim();
-                        
+
                         if (string.IsNullOrWhiteSpace(fullName))
                             continue;
-                        
+
                         int? departmentId = null;
-                        if (!string.IsNullOrWhiteSpace(departmentName) && 
+                        if (!string.IsNullOrWhiteSpace(departmentName) &&
                             departments.TryGetValue(departmentName.ToLower(), out int deptId))
                         {
                             departmentId = deptId;
                         }
-                        
+
                         int? jobTitleId = null;
-                        if (!string.IsNullOrWhiteSpace(jobTitleName) && 
+                        if (!string.IsNullOrWhiteSpace(jobTitleName) &&
                             jobTitles.TryGetValue(jobTitleName.ToLower(), out int titleId))
                         {
                             jobTitleId = titleId;
                         }
-                        
+
                         if (existingEmployees.TryGetValue(fullName.ToLower(), out int existingId))
                         {
                             var employee = new Employee
@@ -315,7 +324,7 @@ namespace SGtest.Services
                                 DepartmentId = departmentId,
                                 JobTitleId = jobTitleId
                             };
-                            
+
                             updatedEmployees.Add(employee);
                         }
                         else
@@ -328,7 +337,7 @@ namespace SGtest.Services
                                 DepartmentId = departmentId,
                                 JobTitleId = jobTitleId
                             };
-                            
+
                             newEmployees.Add(employee);
                             existingEmployees[fullName.ToLower()] = -1; // Placeholder until saved
                         }
@@ -338,19 +347,19 @@ namespace SGtest.Services
                         Console.Error.WriteLine($"Error parsing employee line: {ex.Message}");
                     }
                 }
-                
+
                 if (newEmployees.Count > 0)
                 {
                     _dbContext.Employees.AddRange(newEmployees);
                     _dbContext.SaveChanges();
-                    
+
                     // Update dictionary with a new ids
                     foreach (var emp in newEmployees)
                     {
                         existingEmployees[emp.FullName.ToLower()] = emp.Id;
                     }
                 }
-                
+
                 if (updatedEmployees.Count > 0)
                 {
                     foreach (var emp in updatedEmployees)
@@ -361,10 +370,12 @@ namespace SGtest.Services
                         _dbContext.Entry(emp).Property(e => e.DepartmentId).IsModified = true;
                         _dbContext.Entry(emp).Property(e => e.JobTitleId).IsModified = true;
                     }
+
                     _dbContext.SaveChanges();
                 }
-            });
+            };
             
+            ProcessFileInBatches(filePath, processBatch);
             UpdateDepartmentManagers();
         }
     }

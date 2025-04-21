@@ -138,10 +138,10 @@ namespace SGtest
                     return;
                 }
                 
-                Console.WriteLine("Import completed successfully.");
+                Console.WriteLine("Иморт успешен.");
                 
                 
-                Console.WriteLine("\nCurrent data structure:");
+                Console.WriteLine("\n Структура базы данных:");
                 Console.WriteLine("======================");
                 var printer = new StructurePrinter(dbContext);
                 printer.PrintStructure();
@@ -160,11 +160,11 @@ namespace SGtest
                 
                 if (departmentId.HasValue)
                 {
-                    Console.WriteLine($"Printing structure for department ID {departmentId}:");
+                    Console.WriteLine($"PСтруктура базы данных по DepartmentID = {departmentId}:");
                 }
                 else
                 {
-                    Console.WriteLine("Printing full structure:");
+                    Console.WriteLine("Структура базы данных:");
                 }
                 
                 Console.WriteLine("======================");
