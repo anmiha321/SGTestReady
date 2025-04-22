@@ -227,7 +227,7 @@ namespace SGtest.Services
             
             _dbContext.ChangeTracker.Clear();
             
-            //to put sync parent to children
+            //to sync parent to children
             ProcessFileInBatches(filePath, processBatch);
             UpdateDepartmentManagers();
         }
