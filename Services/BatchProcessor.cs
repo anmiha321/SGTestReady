@@ -93,7 +93,6 @@ namespace SGtest.Services
             };
             
             ProcessFileInBatches(filePath, processBatch);
-            UpdateDepartmentManagers();
         }
         
         public void ImportDepartmentsInBatches(string filePath)
